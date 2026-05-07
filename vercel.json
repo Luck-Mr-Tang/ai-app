@@ -1,0 +1,16 @@
+{
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "installCommand": "pnpm install --no-frozen-lockfile",
+    "buildCommand": "pnpm build:h5",
+    "outputDirectory": "dist/build/h5",
+    "framework": null,
+    "build": {
+        "env": {
+            "HUSKY": "0",
+            "NODE_OPTIONS": "--max-old-space-size=4096"
+        }
+    },
+    "rewrites": [
+        { "source": "/(.*)", "destination": "/index.html" }
+    ]
+}
