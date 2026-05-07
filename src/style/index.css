@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+page {
+    height: 100%;
+}
+
+:root {
+    --bg: #f5f4f0;
+    --bg-2: #ffffff;
+    --bg-3: #ecebe5;
+    --ink: #0f0f12;
+    --ink-2: #5a5a65;
+    --ink-3: #9a9aa3;
+    --ink-4: #cdcdd4;
+    --line: rgba(15, 15, 18, 0.08);
+    --line-2: rgba(15, 15, 18, 0.16);
+
+    --c-coral: #ff5c4d;
+    --c-coral-soft: #ffe5e1;
+    --c-blue: #4060ff;
+    --c-blue-soft: #e3e8ff;
+    --c-purple: #8052ff;
+    --c-purple-soft: #ece1ff;
+    --c-mint: #1ed88a;
+    --c-mint-soft: #d8f8e9;
+    --c-amber: #ffb12b;
+    --c-amber-soft: #fff0d4;
+    --c-pink: #ff66b2;
+    --c-pink-soft: #ffdded;
+    --c-night: #1a1d29;
+    --c-night-soft: #2a2d39;
+
+    --ff-sans: -apple-system, BlinkMacSystemFont, "PingFang SC",
+        "HarmonyOS Sans SC", "Hiragino Sans GB", "Microsoft YaHei",
+        "Helvetica Neue", sans-serif;
+    --ff-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code",
+        Menlo, Consolas, monospace;
+
+    --r-sm: 16rpx;
+    --r-md: 28rpx;
+    --r-lg: 40rpx;
+    --r-xl: 56rpx;
+
+    --shadow-sm: 0 4rpx 12rpx rgba(15, 15, 18, 0.04);
+    --shadow-md: 0 12rpx 32rpx rgba(15, 15, 18, 0.06);
+    --shadow-lg: 0 24rpx 64rpx rgba(15, 15, 18, 0.10);
+}
