@@ -2,7 +2,10 @@
 // 后端运行在 http://localhost:8000，详见 server/README.md
 // 鉴权用 X-User-Id（MVP 简化）。登录信息存 storage。
 
-const BASE = 'http://localhost:8000'
+// 优先用 Vite 注入的环境变量，本地开发回落到 localhost
+const BASE =
+    (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ||
+    'http://localhost:8000'
 const USER_KEY = 'ai_user'
 
 export interface AIUser {
