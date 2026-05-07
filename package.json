@@ -1,6 +1,11 @@
 {
     "name": "app",
     "version": "1.0.0",
+    "packageManager": "pnpm@8.15.4",
+    "engines": {
+        "node": "20.x",
+        "pnpm": ">=8.6.0"
+    },
     "scripts": {
         "dev:app": "uni -p app",
         "dev:app-android": "uni -p app-android",
