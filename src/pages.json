@@ -146,7 +146,72 @@
                     "name": "ai-login",
                     "meta": {
                         "islogin": false,
-                        "title": "选择账号"
+                        "title": "登录"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/register/index",
+                    "name": "ai-register",
+                    "meta": {
+                        "islogin": false,
+                        "title": "注册"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/admin/index",
+                    "name": "ai-admin",
+                    "meta": {
+                        "title": "用户审核"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/usage/index",
+                    "name": "ai-usage",
+                    "meta": {
+                        "islogin": false,
+                        "title": "使用说明"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/about/index",
+                    "name": "ai-about",
+                    "meta": {
+                        "islogin": false,
+                        "title": "关于"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/terms/index",
+                    "name": "ai-terms",
+                    "meta": {
+                        "islogin": false,
+                        "title": "服务条款"
+                    },
+                    "style": {
+                        "navigationStyle": "custom"
+                    }
+                },
+                {
+                    "path": "pages/privacy/index",
+                    "name": "ai-privacy",
+                    "meta": {
+                        "islogin": false,
+                        "title": "隐私协议"
                     },
                     "style": {
                         "navigationStyle": "custom"

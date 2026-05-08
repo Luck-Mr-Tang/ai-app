@@ -1,5 +1,6 @@
 <template>
     <view class="page">
+        <top-toast />
         <view class="topbar">
             <view class="back" @click="goBack">‹</view>
             <view class="who">
@@ -69,6 +70,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { chatHistory, sendChat, type ChatMessage } from '@/api/ai'
+import TopToast from '@/components/top-toast/index.vue'
 
 const characterId = ref(0)
 const characterName = ref('AI')
@@ -94,11 +96,27 @@ async function onSend() {
     if (!canSend.value) return
     const content = input.value.trim()
     input.value = ''
+
+    const tempId = -Date.now()
+    messages.value.push({
+        id: tempId,
+        role: 'user',
+        content,
+        created_at: new Date().toISOString()
+    })
+    scrollToBottom()
+
     sending.value = true
     try {
         const created = await sendChat(characterId.value, content)
-        messages.value.push(...created)
+        const idx = messages.value.findIndex(m => m.id === tempId)
+        if (idx >= 0) messages.value.splice(idx, 1, ...created)
+        else messages.value.push(...created)
         scrollToBottom()
+    } catch (e) {
+        const idx = messages.value.findIndex(m => m.id === tempId)
+        if (idx >= 0) messages.value.splice(idx, 1)
+        throw e
     } finally {
         sending.value = false
     }
@@ -115,17 +133,28 @@ function goBack() {
 }
 </script>
 
+<style lang="scss">
+page {
+    background-color: #f5f4f0;
+}
+</style>
+
 <style lang="scss" scoped>
 .page {
-    display: flex;
-    flex-direction: column;
     height: 100vh;
     background: var(--bg);
     color: var(--ink);
     font-family: var(--ff-sans);
+    position: relative;
+    overflow: hidden;
 }
 
 .topbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -178,10 +207,19 @@ function goBack() {
 }
 
 .scroll {
-    flex: 1;
+    position: fixed;
+    top: 144rpx;
+    left: 0;
+    right: 0;
+    height: calc(100vh - 144rpx - 168rpx);
+    background: var(--bg);
+    box-sizing: border-box;
 }
 .thread {
     padding: 32rpx 32rpx 16rpx;
+    background: var(--bg);
+    min-height: 100%;
+    box-sizing: border-box;
 }
 
 .welcome {
@@ -267,10 +305,15 @@ function goBack() {
 }
 
 .composer {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
     display: flex;
     align-items: center;
     gap: 16rpx;
-    padding: 16rpx 32rpx 36rpx;
+    padding: 16rpx 32rpx calc(36rpx + env(safe-area-inset-bottom));
     background: var(--bg-2);
     box-shadow: 0 -1px 0 var(--line);
     .comp-input {

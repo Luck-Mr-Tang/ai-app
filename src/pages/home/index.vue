@@ -1,5 +1,6 @@
 <template>
     <view class="page">
+        <top-toast />
         <view class="topbar">
             <view class="greet" @click="onAccountTap">
                 <view class="g-line">{{ greetingLine }}</view>
@@ -146,8 +147,9 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref, onMounted, onUnmounted } from 'vue'
+import { reactive, ref, computed, onMounted, onUnmounted } from 'vue'
 import { onShow, onHide } from '@dcloudio/uni-app'
+import TopToast from '@/components/top-toast/index.vue'
 import {
     checkAIHealth,
     clearUser,
@@ -245,7 +247,7 @@ const upcomingModules: ModuleItem[] = [
     }
 ]
 
-const tools = [
+const baseTools: { key: string; icon: string; name: string }[] = [
     { key: 'health', icon: '⚙️', name: 'AI 状态' },
     { key: 'docs', icon: '📚', name: '使用说明' },
     { key: 'feedback', icon: '💬', name: '建议反馈' },
@@ -253,6 +255,14 @@ const tools = [
 ]
 
 const user = ref<AIUser | null>(getCachedUser())
+
+const tools = computed(() => {
+    const list = [...baseTools]
+    if (user.value?.role === 'super') {
+        list.unshift({ key: 'admin', icon: '🛡', name: '用户审核' })
+    }
+    return list
+})
 const health = reactive({ ok: false, checking: true, latency_ms: 0, reason: '' })
 const stats = reactive({ characters: 0, moments: 0 })
 const quickChars = ref<AICharacter[]>([])
@@ -394,6 +404,29 @@ function onTool(t: { key: string }) {
         uni.showToast({
             title: health.ok ? `AI 服务正常 · ${health.latency_ms}ms` : '正在检测...',
             icon: 'none'
+        })
+        return
+    }
+    if (t.key === 'docs') {
+        uni.navigateTo({ url: '/package-ai/pages/usage/index' })
+        return
+    }
+    if (t.key === 'about') {
+        uni.navigateTo({ url: '/package-ai/pages/about/index' })
+        return
+    }
+    if (t.key === 'admin') {
+        ensureUser(() => {
+            uni.navigateTo({ url: '/package-ai/pages/admin/index' })
+        })
+        return
+    }
+    if (t.key === 'feedback') {
+        uni.showModal({
+            title: '建议反馈',
+            content: '欢迎把使用中遇到的问题或建议反馈给我们，我们会尽快处理。\n\n反馈渠道：本应用还在 MVP 阶段，可在「关于」页查看联系方式。',
+            showCancel: false,
+            confirmText: '我知道了'
         })
         return
     }

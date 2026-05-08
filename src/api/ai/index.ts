@@ -2,16 +2,29 @@
 // 后端运行在 http://localhost:8000，详见 server/README.md
 // 鉴权用 X-User-Id（MVP 简化）。登录信息存 storage。
 
-// 优先用 Vite 注入的环境变量，本地开发回落到 localhost
 const BASE =
     (import.meta as { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE ||
     'http://localhost:8000'
 const USER_KEY = 'ai_user'
+const LOGIN_PAGE = '/package-ai/pages/login/index'
 
 export interface AIUser {
     id: number
     username: string
     avatar: string
+    role: 'super' | 'user'
+    status: 'pending' | 'approved' | 'rejected' | 'disabled'
+}
+
+export interface AdminUser {
+    id: number
+    username: string
+    phone: string
+    avatar: string
+    role: 'super' | 'user'
+    status: 'pending' | 'approved' | 'rejected' | 'disabled'
+    is_protected: number
+    created_at: string
 }
 
 export interface AICharacter {
@@ -59,6 +72,11 @@ export function getCachedUser(): AIUser | null {
             uni.removeStorageSync(USER_KEY)
             return null
         }
+        // 旧版本缓存缺少 role/status 字段 → 视为失效
+        if (!parsed.role || !parsed.status) {
+            uni.removeStorageSync(USER_KEY)
+            return null
+        }
         return parsed as AIUser
     } catch {
         uni.removeStorageSync(USER_KEY)
@@ -84,27 +102,53 @@ interface Envelope<T> {
 
 export const NOT_LOGGED_IN = 'NOT_LOGGED_IN'
 
-// 白名单：未登录也能访问的接口
+const DEFAULT_ERR_MSG = '请求失败，请稍后重试'
+const MAX_TOAST_MSG = 20
+
+function pickErrMsg(msg: string | undefined | null): string {
+    if (!msg) return DEFAULT_ERR_MSG
+    return msg.length <= MAX_TOAST_MSG ? msg : DEFAULT_ERR_MSG
+}
+
+function showTopToast(title: string) {
+    uni.$emit('top-toast', title)
+}
+
 const PUBLIC_PATTERNS: Array<(method: string, path: string) => boolean> = [
     (_, p) => p.startsWith('/api/health'),
-    (_, p) => p === '/api/auth/users',
-    (m, p) => m === 'POST' && p === '/api/auth/register-or-login',
-    (m, p) => m === 'GET' && p === '/api/characters',
-    (m, p) => m === 'GET' && /^\/api\/characters\/\d+$/.test(p)
+    (m, p) => m === 'POST' && p === '/api/auth/login',
+    (m, p) => m === 'POST' && p === '/api/auth/register'
 ]
 
 function isPublic(method: string, path: string): boolean {
     return PUBLIC_PATTERNS.some(fn => fn(method, path))
 }
 
+let redirectingToLogin = false
+
+function redirectToLogin() {
+    if (redirectingToLogin) return
+    const pages = (typeof getCurrentPages === 'function' ? getCurrentPages() : []) as Array<{ route?: string }>
+    const top = pages[pages.length - 1]
+    if (top?.route && LOGIN_PAGE.includes(top.route)) return
+    redirectingToLogin = true
+    clearUser()
+    uni.reLaunch({
+        url: LOGIN_PAGE,
+        complete: () => {
+            redirectingToLogin = false
+        }
+    })
+}
+
 function call<T = unknown>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'DELETE',
     path: string,
     data?: Record<string, unknown>,
     opts?: { silent?: boolean }
 ): Promise<T> {
-    // 拦截器：未登录拒绝调用需鉴权的接口
     if (!isPublic(method, path) && !getCachedUser()) {
+        redirectToLogin()
         return Promise.reject(new Error(NOT_LOGGED_IN))
     }
 
@@ -123,22 +167,29 @@ function call<T = unknown>(
                     if (env.success) {
                         resolve(env.data as T)
                     } else {
-                        if (!opts?.silent) uni.showToast({ title: env.msg || `HTTP ${env.code}`, icon: 'none' })
-                        reject(new Error(env.msg || `HTTP ${env.code}`))
+                        const rawMsg = env.msg || ''
+                        if (!opts?.silent) {
+                            showTopToast(pickErrMsg(rawMsg))
+                        }
+                        if (env.code === 401) redirectToLogin()
+                        reject(new Error(rawMsg || `HTTP ${env.code}`))
                     }
                     return
                 }
-                // 兼容老格式（万一）
                 if (res.statusCode >= 200 && res.statusCode < 300) {
                     resolve(res.data as T)
                 } else {
-                    const msg = `HTTP ${res.statusCode}`
-                    if (!opts?.silent) uni.showToast({ title: msg, icon: 'none' })
-                    reject(new Error(msg))
+                    if (!opts?.silent) {
+                        showTopToast(DEFAULT_ERR_MSG)
+                    }
+                    if (res.statusCode === 401) redirectToLogin()
+                    reject(new Error(`HTTP ${res.statusCode}`))
                 }
             },
             fail: err => {
-                if (!opts?.silent) uni.showToast({ title: '网络错误：' + (err.errMsg || ''), icon: 'none' })
+                if (!opts?.silent) {
+                    showTopToast(DEFAULT_ERR_MSG)
+                }
                 reject(err)
             }
         })
@@ -155,19 +206,16 @@ export interface AIHealth {
 
 export const checkAIHealth = () => call<AIHealth>('GET', '/api/health/ai')
 
-export const listUsers = () => call<AIUser[]>('GET', '/api/auth/users', undefined, { silent: true })
-
-export async function login(username: string): Promise<AIUser> {
-    const u = await call<AIUser>('POST', '/api/auth/register-or-login', { username })
+export async function login(username: string, password: string): Promise<AIUser> {
+    const u = await call<AIUser>('POST', '/api/auth/login', { username, password })
     setCachedUser(u)
     return u
 }
 
-export function loginAs(u: AIUser): AIUser {
-    if (!u || !u.id) throw new Error('invalid user')
-    uni.setStorageSync(USER_KEY, JSON.stringify(u))
-    return u
-}
+export const register = (username: string, phone: string, password: string) =>
+    call<AIUser>('POST', '/api/auth/register', { username, phone, password })
+
+export const me = () => call<AIUser>('GET', '/api/auth/me')
 
 export const listCharacters = () => call<AICharacter[]>('GET', '/api/characters')
 export const getCharacter = (id: number) => call<AICharacter>('GET', `/api/characters/${id}`)
@@ -189,3 +237,13 @@ export const listComments = (moment_id: number) =>
     call<CommentItem[]>('GET', `/api/moments/${moment_id}/comments`)
 export const addComment = (moment_id: number, content: string) =>
     call<CommentItem>('POST', `/api/moments/${moment_id}/comments`, { content })
+
+// 超管接口
+export const adminListUsers = (status?: string) =>
+    call<AdminUser[]>('GET', `/api/admin/users${status ? `?status_filter=${status}` : ''}`)
+export const adminApproveUser = (uid: number) =>
+    call<AdminUser>('POST', `/api/admin/users/${uid}/approve`)
+export const adminRejectUser = (uid: number) =>
+    call<AdminUser>('POST', `/api/admin/users/${uid}/reject`)
+export const adminDeleteUser = (uid: number) =>
+    call<{ deleted: number }>('DELETE', `/api/admin/users/${uid}`)

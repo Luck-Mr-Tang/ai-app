@@ -1,275 +1,252 @@
 <template>
     <view class="page">
-        <view class="topbar">
-            <view class="back" @click="goBack">‹</view>
-        </view>
-
+        <top-toast />
         <view class="hero">
             <view class="h-emoji">👋</view>
-            <view class="h-title">选个账号<br />开始聊天</view>
-            <view class="h-sub">挑一个老账号继续，或新建一个</view>
+            <view class="h-title">欢迎回来</view>
+            <view class="h-sub">使用已审核通过的账号登录</view>
         </view>
 
-        <view class="sec">
-            <view class="sec-h">
-                <text class="sec-t">已有账号</text>
-                <text class="sec-cnt">{{ users.length }}</text>
-            </view>
-
-            <view v-if="loading" class="loading">读取中…</view>
-
-            <view v-else-if="users.length === 0" class="empty">
-                还没有账号 · 在下方新建一个吧
-            </view>
-
-            <view v-else class="user-grid">
-                <view
-                    v-for="(u, i) in users"
-                    :key="u.id"
-                    class="ucell"
-                    :style="{ '--accent': accents[i % accents.length] }"
-                    @click="onPick(u)"
-                >
-                    <view class="ucell-avatar">{{ u.username.slice(0, 1).toUpperCase() }}</view>
-                    <view class="ucell-name">{{ u.username }}</view>
-                    <view class="ucell-id">#{{ u.id }}</view>
+        <view class="form">
+            <view class="field">
+                <view class="lbl">用户名</view>
+                <view class="ai-input">
+                    <input
+                        class="ipt"
+                        v-model="username"
+                        placeholder="请输入用户名"
+                        placeholder-class="ipt-ph"
+                        confirm-type="next"
+                    />
                 </view>
             </view>
-        </view>
 
-        <view class="sec">
-            <view class="sec-h">
-                <text class="sec-t">新建账号</text>
+            <view class="field">
+                <view class="lbl">密码</view>
+                <view class="ai-input pwd">
+                    <input
+                        class="ipt"
+                        :type="showPwd ? 'text' : 'password'"
+                        :password="!showPwd"
+                        v-model="password"
+                        placeholder="请输入密码"
+                        placeholder-class="ipt-ph"
+                        confirm-type="done"
+                    />
+                    <view class="eye" @click="showPwd = !showPwd">
+                        {{ showPwd ? '🙈' : '👁' }}
+                    </view>
+                </view>
             </view>
-            <view class="ai-input">
-                <wd-input
-                    v-model="newName"
-                    placeholder="输入一个昵称（2-32 字符）"
-                    no-border
-                />
+
+            <view class="agree" @click="agreed = !agreed">
+                <view class="cb" :class="{ on: agreed }">
+                    <text v-if="agreed">✓</text>
+                </view>
+                <view class="agree-txt">
+                    我已阅读并同意
+                    <text class="link" @click.stop="goTerms">《服务条款》</text>
+                    与
+                    <text class="link" @click.stop="goPrivacy">《隐私协议》</text>
+                </view>
             </view>
+
             <view
                 class="primary-btn"
-                :class="{ disabled: !newName.trim() || creating }"
-                @click="onCreate"
+                :class="{ disabled: !canSubmit }"
+                @click="onLogin"
             >
-                {{ creating ? '创建中…' : '创建并登录' }}
+                {{ submitting ? '登录中…' : '登录' }}
             </view>
+
+            <view class="alt">
+                还没有账号？
+                <text class="link" @click="goRegister">去注册</text>
+            </view>
+        </view>
+
+        <view class="footer">
+            <text class="ft" @click="goAbout">关于 · v0.1 MVP</text>
         </view>
     </view>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { listUsers, login, loginAs, type AIUser } from '@/api/ai'
+import { ref, computed } from 'vue'
+import { login } from '@/api/ai'
+import TopToast from '@/components/top-toast/index.vue'
 
-const users = ref<AIUser[]>([])
-const loading = ref(false)
-const newName = ref('')
-const creating = ref(false)
-const accents = ['#FF5C4D', '#4060FF', '#8052FF', '#1ED88A', '#FFB12B', '#FF66B2']
+const username = ref('')
+const password = ref('')
+const showPwd = ref(false)
+const agreed = ref(false)
+const submitting = ref(false)
 
-async function load() {
-    loading.value = true
-    try {
-        const list = await listUsers()
-        users.value = Array.isArray(list) ? list : []
-    } catch (e) {
-        console.warn('listUsers failed', e)
-        users.value = []
-    } finally {
-        loading.value = false
-    }
-}
+const canSubmit = computed(
+    () => !!username.value.trim() && !!password.value && agreed.value && !submitting.value
+)
 
-function onPick(u: AIUser) {
-    if (!u || !u.id) {
-        uni.showToast({ title: '账号无效', icon: 'none' })
+async function onLogin() {
+    if (!username.value.trim() || !password.value) {
+        uni.showToast({ title: '请输入用户名和密码', icon: 'none' })
         return
     }
-    try {
-        loginAs(u)
-        uni.showToast({ title: `Hi, ${u.username}`, icon: 'none' })
-        setTimeout(() => goBack(), 300)
-    } catch (e) {
-        console.warn('loginAs failed', e)
-        uni.showToast({ title: '登录失败', icon: 'none' })
+    if (!agreed.value) {
+        uni.showToast({ title: '请先同意服务条款和隐私协议', icon: 'none' })
+        return
     }
-}
-
-async function onCreate() {
-    const name = newName.value.trim()
-    if (!name || creating.value) return
-    creating.value = true
+    if (submitting.value) return
+    submitting.value = true
     try {
-        const u = await login(name)
-        if (!u || !u.id) {
-            uni.showToast({ title: '创建失败', icon: 'none' })
-            return
-        }
-        uni.showToast({ title: `欢迎 ${u.username}`, icon: 'none' })
-        setTimeout(() => goBack(), 300)
+        const u = await login(username.value.trim(), password.value)
+        uni.showToast({ title: `欢迎，${u.username}`, icon: 'none' })
+        setTimeout(() => {
+            uni.reLaunch({ url: '/pages/home/index' })
+        }, 300)
     } catch (e) {
         console.warn('login failed', e)
     } finally {
-        creating.value = false
+        submitting.value = false
     }
 }
 
-function goBack() {
-    const pages = getCurrentPages()
-    if (pages.length > 1) {
-        uni.navigateBack()
-    } else {
-        uni.switchTab({
-            url: '/pages/home/index',
-            fail: () => uni.reLaunch({ url: '/pages/home/index' })
-        })
-    }
+function goRegister() {
+    uni.navigateTo({ url: '/package-ai/pages/register/index' })
 }
-
-onMounted(load)
+function goTerms() {
+    uni.navigateTo({ url: '/package-ai/pages/terms/index' })
+}
+function goPrivacy() {
+    uni.navigateTo({ url: '/package-ai/pages/privacy/index' })
+}
+function goAbout() {
+    uni.navigateTo({ url: '/package-ai/pages/about/index' })
+}
 </script>
+
+<style lang="scss">
+page {
+    background-color: #f5f4f0;
+}
+</style>
 
 <style lang="scss" scoped>
 .page {
     min-height: 100vh;
     background: var(--bg);
-    padding: 60rpx 32rpx 120rpx;
+    padding: 64rpx 32rpx 32rpx;
     color: var(--ink);
     font-family: var(--ff-sans);
-}
-.topbar {
-    margin-bottom: 28rpx;
-    .back {
-        width: 64rpx;
-        height: 64rpx;
-        border-radius: 50%;
-        background: var(--bg-2);
-        font-size: 36rpx;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: var(--shadow-sm);
-    }
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
 }
 .hero {
-    margin-bottom: 56rpx;
+    margin-bottom: 36rpx;
     .h-emoji {
-        font-size: 64rpx;
-        margin-bottom: 16rpx;
+        font-size: 52rpx;
+        line-height: 1;
+        margin-bottom: 10rpx;
     }
     .h-title {
-        font-size: 60rpx;
+        font-size: 48rpx;
         font-weight: 800;
+        letter-spacing: -1rpx;
         line-height: 1.15;
-        letter-spacing: -2rpx;
     }
     .h-sub {
-        font-size: 26rpx;
+        font-size: 24rpx;
         color: var(--ink-3);
-        margin-top: 14rpx;
+        margin-top: 8rpx;
     }
 }
-.sec {
-    margin-bottom: 56rpx;
-    .sec-h {
-        display: flex;
-        align-items: baseline;
-        gap: 12rpx;
-        margin-bottom: 24rpx;
-        .sec-t {
-            font-size: 30rpx;
-            font-weight: 800;
-            letter-spacing: -0.5rpx;
-        }
-        .sec-cnt {
-            font-size: 22rpx;
-            color: var(--ink-3);
-            font-feature-settings: "tnum";
-        }
-    }
+.form {
+    flex: 1;
 }
-.loading,
-.empty {
-    text-align: center;
-    padding: 60rpx 0;
-    font-size: 26rpx;
-    color: var(--ink-3);
-}
-.user-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 16rpx;
-}
-.ucell {
-    --accent: #ff5c4d;
-    padding: 24rpx 16rpx;
-    background: var(--bg-2);
-    border-radius: var(--r-md);
-    text-align: center;
-    box-shadow: var(--shadow-sm);
-    transition: transform 0.18s ease;
-    &:active { transform: scale(0.95); }
-    .ucell-avatar {
-        width: 88rpx;
-        height: 88rpx;
-        margin: 0 auto 12rpx;
-        border-radius: 28rpx;
-        background: var(--accent);
-        color: #fff;
-        font-size: 40rpx;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 8rpx 20rpx -6rpx var(--accent);
-    }
-    .ucell-name {
-        font-size: 26rpx;
-        font-weight: 700;
-        max-width: 100%;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .ucell-id {
-        font-size: 20rpx;
-        color: var(--ink-3);
-        margin-top: 4rpx;
-        font-family: var(--ff-mono);
+.field {
+    margin-bottom: 22rpx;
+    .lbl {
+        font-size: 24rpx;
+        color: var(--ink-2);
+        margin-bottom: 10rpx;
+        font-weight: 600;
     }
 }
 .ai-input {
+    display: flex;
+    align-items: center;
     background: var(--bg-2);
     border-radius: var(--r-md);
     padding: 0 24rpx;
-    margin-bottom: 20rpx;
     box-shadow: var(--shadow-sm);
-    :deep(.wd-input),
-    :deep(.wd-input__inner),
-    :deep(.wd-input__bd) {
-        background: transparent !important;
-        padding: 0 !important;
-        border: 0 !important;
+    .ipt {
+        flex: 1;
+        height: 80rpx;
+        font-size: 28rpx;
+        font-family: var(--ff-sans);
+        color: var(--ink);
+        background: transparent;
+        border: 0;
+        padding: 0;
     }
-    :deep(.wd-input__value),
-    :deep(.wd-input__inner input) {
-        font-family: var(--ff-sans) !important;
-        font-size: 28rpx !important;
-        color: var(--ink) !important;
-        background: transparent !important;
-        padding: 28rpx 0 !important;
+    .ipt-ph {
+        color: var(--ink-3);
+        font-family: var(--ff-sans);
     }
-    :deep(.wd-input__placeholder),
-    :deep(.is-placeholder) {
-        color: var(--ink-3) !important;
-        font-family: var(--ff-sans) !important;
+    &.pwd {
+        padding-right: 12rpx;
+    }
+    .eye {
+        width: 64rpx;
+        height: 64rpx;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32rpx;
+        color: var(--ink-2);
+        flex-shrink: 0;
+        opacity: 0.85;
+        &:active { opacity: 0.55; }
+    }
+}
+.agree {
+    display: flex;
+    align-items: center;
+    gap: 12rpx;
+    margin: 22rpx 4rpx 28rpx;
+    .cb {
+        width: 30rpx;
+        height: 30rpx;
+        border-radius: 8rpx;
+        border: 2rpx solid var(--ink-3);
+        background: var(--bg-2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22rpx;
+        line-height: 1;
+        color: transparent;
+        flex-shrink: 0;
+        &.on {
+            background: var(--ink);
+            border-color: var(--ink);
+            color: #fff;
+        }
+    }
+    .agree-txt {
+        flex: 1;
+        font-size: 22rpx;
+        color: var(--ink-2);
+        line-height: 1.4;
+    }
+    .link {
+        color: var(--c-coral);
+        font-weight: 600;
     }
 }
 .primary-btn {
     text-align: center;
-    padding: 32rpx 0;
+    padding: 24rpx 0;
     background: var(--ink);
     color: #fff;
     font-size: 30rpx;
@@ -281,6 +258,27 @@ onMounted(load)
     &.disabled {
         background: var(--ink-4);
         box-shadow: none;
+    }
+}
+.alt {
+    text-align: center;
+    margin-top: 22rpx;
+    font-size: 24rpx;
+    color: var(--ink-2);
+    .link {
+        color: var(--c-coral);
+        font-weight: 700;
+        margin-left: 4rpx;
+    }
+}
+.footer {
+    text-align: center;
+    margin-top: 24rpx;
+    .ft {
+        font-size: 20rpx;
+        color: var(--ink-3);
+        font-family: var(--ff-mono);
+        letter-spacing: 1rpx;
     }
 }
 </style>
